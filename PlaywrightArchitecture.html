@@ -1,0 +1,567 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Backstage: How Playwright Is Built</title>
+<style>
+
+  @import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Source+Sans+3:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+  :root{
+    --ink: #1b1a17;
+    --stage: #201f1c;
+    --curtain: #2a2823;
+    --paper: #f4efe4;
+    --paper-dim: #cdc6b3;
+    --amber: #e8a33d;
+    --amber-dim: #a97b34;
+    --slate: #7fa3ad;
+    --line: #423f38;
+    --line-bright: #5a5648;
+    --red: #c1594a;
+  }
+
+  *{ box-sizing: border-box; }
+
+  html{ scroll-behavior: smooth; }
+
+  body{
+    margin:0;
+    background: var(--ink);
+    color: var(--paper);
+    font-family: 'Source Sans 3', sans-serif;
+    font-size: 17px;
+    line-height: 1.65;
+  }
+
+  h1, h2, h3, .display{
+    font-family: 'Fraunces', serif;
+    font-weight: 600;
+    color: var(--paper);
+    margin: 0;
+  }
+
+  code, .mono{
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  a{ color: var(--amber); }
+
+  .wrap{
+    max-width: 780px;
+    margin: 0 auto;
+    padding: 0 28px;
+  }
+
+  .wide{
+    max-width: 980px;
+    margin: 0 auto;
+    padding: 0 28px;
+  }
+
+  /* ---------- Hero ---------- */
+
+  .hero{
+    position: relative;
+    padding: 130px 0 100px;
+    border-bottom: 1px solid var(--line);
+    overflow: hidden;
+  }
+
+  .hero::before{
+    content: "";
+    position: absolute;
+    inset: 0;
+    background-image:
+      repeating-linear-gradient(90deg, var(--curtain) 0 2px, transparent 2px 68px);
+    opacity: .55;
+    pointer-events: none;
+  }
+
+  .hero .eyebrow{
+    color: var(--slate);
+    font-size: 15px;
+    letter-spacing: .02em;
+    margin-bottom: 18px;
+    position: relative;
+  }
+
+  .hero h1{
+    font-size: clamp(42px, 6vw, 68px);
+    line-height: 1.05;
+    max-width: 11.5ch;
+    position: relative;
+  }
+
+  .hero h1 em{
+    font-style: italic;
+    color: var(--amber);
+  }
+
+  .hero p{
+    max-width: 56ch;
+    margin-top: 26px;
+    font-size: 19px;
+    color: var(--paper-dim);
+    position: relative;
+  }
+
+  /* ---------- Section rhythm ---------- */
+
+  section{
+    padding: 88px 0;
+    border-bottom: 1px solid var(--line);
+  }
+
+  section:last-of-type{ border-bottom: none; }
+
+  .kicker{
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    color: var(--slate);
+    margin-bottom: 14px;
+  }
+
+  h2{
+    font-size: clamp(28px, 3.4vw, 36px);
+    max-width: 20ch;
+    margin-bottom: 22px;
+  }
+
+  section > .wrap > p, section > .wide > p{
+    max-width: 66ch;
+    color: var(--paper-dim);
+    font-size: 17px;
+  }
+
+  section > .wrap > p + p, section > .wide > p + p{
+    margin-top: 16px;
+  }
+
+  .lede{
+    font-size: 20px !important;
+    color: var(--paper) !important;
+  }
+
+  /* ---------- Diagram shells ---------- */
+
+  .stage-box{
+    margin: 44px 0 8px;
+    border: 1px solid var(--line-bright);
+    background: var(--stage);
+    border-radius: 3px;
+    padding: 34px 30px 26px;
+  }
+
+  .stage-box svg{ width: 100%; height: auto; display: block; }
+
+  .stage-caption{
+    font-size: 14px;
+    color: var(--paper-dim);
+    margin-top: 14px;
+    max-width: 62ch;
+  }
+
+  /* ---------- Layer list (anatomy) ---------- */
+
+  .layers{
+    margin-top: 40px;
+    border-top: 1px solid var(--line);
+  }
+
+  .layer{
+    display: grid;
+    grid-template-columns: 90px 1fr;
+    gap: 24px;
+    padding: 26px 0;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .layer .num{
+    font-family: 'JetBrains Mono', monospace;
+    color: var(--amber-dim);
+    font-size: 14px;
+    padding-top: 4px;
+  }
+
+  .layer h3{
+    font-size: 20px;
+    margin-bottom: 8px;
+  }
+
+  .layer p{
+    color: var(--paper-dim);
+    margin: 0;
+    max-width: 58ch;
+    font-size: 16px;
+  }
+
+  .layer .tag{
+    display: inline-block;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    color: var(--slate);
+    border: 1px solid var(--line-bright);
+    padding: 2px 8px;
+    border-radius: 20px;
+    margin-top: 10px;
+  }
+
+  /* ---------- Two column feature ---------- */
+
+  .split{
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 50px;
+    margin-top: 36px;
+  }
+
+  @media (max-width: 760px){
+    .split{ grid-template-columns: 1fr; }
+    .layer{ grid-template-columns: 1fr; }
+  }
+
+  .split h3{
+    font-size: 19px;
+    margin-bottom: 10px;
+    color: var(--amber);
+  }
+
+  .split p{
+    color: var(--paper-dim);
+    font-size: 15.5px;
+    margin: 0;
+  }
+
+  /* ---------- Retry loop ---------- */
+
+  .loop-steps{
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 28px;
+  }
+
+  .loop-step{
+    flex: 1 1 150px;
+    border: 1px solid var(--line-bright);
+    border-radius: 3px;
+    padding: 16px 16px 14px;
+    background: var(--stage);
+  }
+
+  .loop-step .n{
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    color: var(--slate);
+  }
+
+  .loop-step p{
+    margin: 8px 0 0;
+    font-size: 14.5px;
+    color: var(--paper-dim);
+  }
+
+  /* ---------- Table ---------- */
+
+  table{
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 30px;
+    font-size: 15px;
+  }
+
+  th, td{
+    text-align: left;
+    padding: 12px 16px 12px 0;
+    border-bottom: 1px solid var(--line);
+    vertical-align: top;
+  }
+
+  th{
+    color: var(--slate);
+    font-weight: 500;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12.5px;
+  }
+
+  td{ color: var(--paper-dim); }
+
+  td.hl{ color: var(--paper); }
+
+  /* ---------- Aside ---------- */
+
+  .aside{
+    border-left: 2px solid var(--amber-dim);
+    padding: 4px 0 4px 22px;
+    margin-top: 40px;
+    color: var(--paper-dim);
+    font-size: 15.5px;
+    max-width: 60ch;
+  }
+
+  .aside strong{ color: var(--paper); }
+
+  /* ---------- Footer ---------- */
+
+  footer{
+    padding: 60px 0 90px;
+  }
+
+  footer p{
+    color: var(--paper-dim);
+    font-size: 14px;
+    max-width: 60ch;
+  }
+
+  footer .sources{
+    margin-top: 20px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 18px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12.5px;
+  }
+
+  footer .sources a{ color: var(--slate); text-decoration: none; }
+  footer .sources a:hover{ text-decoration: underline; }
+
+  @media (prefers-reduced-motion: reduce){
+    html{ scroll-behavior: auto; }
+  }
+
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <div class="wrap">
+    <div class="eyebrow mono">ARCHITECTURE NOTES · BROWSER AUTOMATION</div>
+    <h1>What happens <em>backstage</em> when Playwright runs a test</h1>
+    <p>A test script never touches the browser directly. It hands its lines to a server, which hands them to the browser, which performs the scene. This is a tour of that whole chain — client, protocol, server, and the three browser engines underneath.</p>
+  </div>
+</header>
+
+<section id="model">
+  <div class="wrap">
+    <div class="kicker">01 — THE CENTRAL DECISION</div>
+    <h2>One server directs three different actors</h2>
+    <p class="lede">Playwright's core design choice is to separate the code you write from the browser that runs it, and to put a single coordinating process — the Playwright Server — in between.</p>
+    <p>Your test calls something like <code>page.click()</code>. That call doesn't reach into the browser. It's serialized into a message and sent over a long-lived WebSocket to a Node.js server process. The server is the only thing that ever speaks to a browser directly, using each engine's own remote-control protocol. It translates your one command into whatever that engine needs, waits for the result, and streams the answer back.</p>
+    <p>Because the connection is a persistent, full-duplex socket rather than a request-and-wait HTTP call, the server can also push things at your test unprompted — a console message, a new tab opening, a network request firing — instead of only replying when asked.</p>
+  </div>
+
+  <div class="wide">
+    <div class="stage-box">
+      <svg viewBox="0 0 920 220" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M0,0 L10,5 L0,10 z" fill="#7fa3ad"/>
+          </marker>
+        </defs>
+
+        <!-- client -->
+        <rect x="10" y="70" width="150" height="80" rx="3" fill="#2a2823" stroke="#5a5648"/>
+        <text x="85" y="105" text-anchor="middle" fill="#f4efe4" font-family="Fraunces, serif" font-size="16">Test code</text>
+        <text x="85" y="126" text-anchor="middle" fill="#cdc6b3" font-family="JetBrains Mono, monospace" font-size="11">client</text>
+
+        <!-- protocol channel -->
+        <line x1="160" y1="110" x2="290" y2="110" stroke="#7fa3ad" stroke-width="1.5" marker-end="url(#arrow)"/>
+        <line x1="290" y1="130" x2="160" y2="130" stroke="#7fa3ad" stroke-width="1.5" marker-end="url(#arrow)"/>
+        <text x="225" y="95" text-anchor="middle" fill="#7fa3ad" font-family="JetBrains Mono, monospace" font-size="10.5">WebSocket / JSON</text>
+
+        <!-- server -->
+        <rect x="300" y="55" width="180" height="110" rx="3" fill="#2a2823" stroke="#e8a33d"/>
+        <text x="390" y="95" text-anchor="middle" fill="#f4efe4" font-family="Fraunces, serif" font-size="16">Playwright Server</text>
+        <text x="390" y="116" text-anchor="middle" fill="#cdc6b3" font-family="JetBrains Mono, monospace" font-size="10.5">dispatchers +</text>
+        <text x="390" y="132" text-anchor="middle" fill="#cdc6b3" font-family="JetBrains Mono, monospace" font-size="10.5">browser objects</text>
+
+        <!-- protocol to browser -->
+        <line x1="480" y1="95" x2="600" y2="70" stroke="#7fa3ad" stroke-width="1.5" marker-end="url(#arrow)"/>
+        <line x1="480" y1="110" x2="600" y2="110" stroke="#7fa3ad" stroke-width="1.5" marker-end="url(#arrow)"/>
+        <line x1="480" y1="125" x2="600" y2="150" stroke="#7fa3ad" stroke-width="1.5" marker-end="url(#arrow)"/>
+        <text x="545" y="60" text-anchor="middle" fill="#7fa3ad" font-family="JetBrains Mono, monospace" font-size="9.5">CDP</text>
+        <text x="545" y="100" text-anchor="middle" fill="#7fa3ad" font-family="JetBrains Mono, monospace" font-size="9.5">CDP-compatible</text>
+        <text x="545" y="168" text-anchor="middle" fill="#7fa3ad" font-family="JetBrains Mono, monospace" font-size="9.5">CDP-compatible</text>
+
+        <!-- browsers -->
+        <rect x="610" y="30" width="300" height="55" rx="3" fill="#201f1c" stroke="#5a5648"/>
+        <text x="760" y="63" text-anchor="middle" fill="#f4efe4" font-family="JetBrains Mono, monospace" font-size="13">Chromium</text>
+
+        <rect x="610" y="90" width="300" height="55" rx="3" fill="#201f1c" stroke="#5a5648"/>
+        <text x="760" y="123" text-anchor="middle" fill="#f4efe4" font-family="JetBrains Mono, monospace" font-size="13">Firefox (patched)</text>
+
+        <rect x="610" y="150" width="300" height="55" rx="3" fill="#201f1c" stroke="#5a5648"/>
+        <text x="760" y="183" text-anchor="middle" fill="#f4efe4" font-family="JetBrains Mono, monospace" font-size="13">WebKit (patched)</text>
+      </svg>
+      <p class="stage-caption">Client, server, and browser are three separate processes. The server is the only one that speaks a browser's native protocol — Chrome DevTools Protocol for Chromium, and CDP-shaped protocol layers that the Playwright team patches directly into Firefox and WebKit's own source, since neither ships an equivalent by default.</p>
+    </div>
+  </div>
+</section>
+
+<section id="anatomy">
+  <div class="wrap">
+    <div class="kicker">02 — INSIDE THE SERVER</div>
+    <h2>Five layers between your call and the click</h2>
+    <p>The client-server split isn't just two boxes — the source is organized into a stack, each layer responsible for one translation step.</p>
+  </div>
+
+  <div class="wide layers">
+    <div class="layer">
+      <div class="num">01</div>
+      <div>
+        <h3>Client API</h3>
+        <p>The public methods you call — <code>page.click()</code>, <code>locator.fill()</code>. Every client object (Page, Frame, BrowserContext) inherits from a base class that turns a method call into an outgoing message instead of doing the work itself.</p>
+        <span class="tag">ChannelOwner</span>
+      </div>
+    </div>
+    <div class="layer">
+      <div class="num">02</div>
+      <div>
+        <h3>Protocol definition</h3>
+        <p>A schema file describes every method, its parameters, and the events it can emit. Client and server code for these messages is generated from this single definition, so the two sides can never quietly drift apart.</p>
+        <span class="tag">protocol.yml</span>
+      </div>
+    </div>
+    <div class="layer">
+      <div class="num">03</div>
+      <div>
+        <h3>Dispatcher</h3>
+        <p>On the server, a dispatcher exists for every object type — BrowserDispatcher, PageDispatcher, FrameDispatcher, and so on. It receives a protocol message and routes it to the matching internal object, then reverses the trip for the response.</p>
+        <span class="tag">server-side routing</span>
+      </div>
+    </div>
+    <div class="layer">
+      <div class="num">04</div>
+      <div>
+        <h3>Server / core</h3>
+        <p>The actual automation logic: computing whether an element is actionable, managing contexts and frames, recording network traffic, driving input events. This layer knows nothing about WebSockets — it only knows browsers.</p>
+        <span class="tag">browser-agnostic</span>
+      </div>
+    </div>
+    <div class="layer">
+      <div class="num">05</div>
+      <div>
+        <h3>Browser-specific driver</h3>
+        <p>The thin bottom layer that actually speaks CDP, or the patched equivalent that Firefox and WebKit expose. This is the only part of the stack that changes per browser engine.</p>
+        <span class="tag">CDP / patched protocols</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="wide">
+    <div class="aside">
+      <strong>Why bother with a generated schema at all?</strong> It gives Playwright a hard boundary between "the API developers write against" and "how a browser is actually automated." That boundary is also what lets one Node.js server support Python, Java, .NET, and Go clients — each language ships a small binding plus a bundled copy of the Node runtime, and talks to it over stdio instead of reimplementing the automation logic per language.
+    </div>
+  </div>
+</section>
+
+<section id="isolation">
+  <div class="wrap">
+    <div class="kicker">03 — ISOLATION</div>
+    <h2>Contexts, not new browsers</h2>
+    <p class="lede">Launching a browser process is slow and heavy. Playwright's answer is to launch one browser and carve it into cheap, disposable sessions instead.</p>
+    <p>A <strong>browser context</strong> is roughly equivalent to a fresh incognito profile — its own cookies, local storage, permissions, and cache — created inside an already-running browser process in milliseconds. A <strong>page</strong> is a single tab within that context. Because contexts don't share state, dozens of them can exist side by side inside one browser, which is what makes running many tests in parallel practical: each test gets a clean slate without the cost of a brand-new browser launch.</p>
+  </div>
+
+  <div class="wide">
+    <div class="split">
+      <div>
+        <h3>One browser process</h3>
+        <p>Chromium, Firefox, or WebKit starts once and stays warm. Starting it is the expensive part, so Playwright avoids repeating it.</p>
+      </div>
+      <div>
+        <h3>Many contexts inside it</h3>
+        <p>Each context is an isolated session — its own storage and cookies — created and torn down cheaply, which is what a fresh test run actually needs.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="autowait">
+  <div class="wrap">
+    <div class="kicker">04 — TIMING</div>
+    <h2>Actions wait for the page to mean it</h2>
+    <p>Before performing an action like a click or a fill, Playwright doesn't just check that an element exists in the DOM — it runs a small set of actionability checks and keeps re-checking them until they all pass or a timeout is hit. This is what removes the sleep-based waiting that made older automation tools flaky.</p>
+  </div>
+
+  <div class="wide">
+    <div class="loop-steps">
+      <div class="loop-step">
+        <div class="n mono">check</div>
+        <p>Is it attached to the DOM and visible?</p>
+      </div>
+      <div class="loop-step">
+        <div class="n mono">check</div>
+        <p>Is it stable — not mid-animation or mid-transition?</p>
+      </div>
+      <div class="loop-step">
+        <div class="n mono">check</div>
+        <p>Does it receive events, or is something else covering it?</p>
+      </div>
+      <div class="loop-step">
+        <div class="n mono">check</div>
+        <p>Is it enabled, and not read-only where that matters?</p>
+      </div>
+      <div class="loop-step">
+        <div class="n mono">retry</div>
+        <p>If any check fails, wait briefly and run the whole set again.</p>
+      </div>
+    </div>
+    <div class="aside">
+      The same retry idea extends to assertions — a web-first assertion like expecting some text to appear doesn't just check once, it polls until the condition holds or the timeout expires. The trade-off: actionability is judged against a page that keeps changing, so an element that re-renders mid-check can still cause a failure. The usual fix is anchoring a locator to something stable rather than to text that gets swapped out.
+    </div>
+  </div>
+</section>
+
+<section id="runner">
+  <div class="wrap">
+    <div class="kicker">05 — THE TEST RUNNER</div>
+    <h2>Workers, fixtures, and a dependency graph</h2>
+    <p>Playwright the automation library and Playwright Test the runner are separate layers. The runner is what most people write tests against day to day, and it adds its own architecture on top of everything above.</p>
+    <p>A <strong>worker</strong> is a full OS process, not a thread — the runner spawns several of them (by default, roughly half the machine's logical cores) and hands each one a batch of test files to get through on its own. Workers share nothing: no variables, no browser, no cookies. When a test fails, its worker is discarded and a fresh one takes its place, so one bad test can't contaminate the next.</p>
+    <p><strong>Fixtures</strong> are the runner's dependency-injection system — the mechanism that hands a test its browser, page, or logged-in session, and cleans each one up afterward. A fixture can be scoped to a single test or to an entire worker, and the runner resolves the whole dependency graph before a test body ever runs.</p>
+  </div>
+
+  <div class="wide">
+    <table>
+      <tr><th>Concept</th><th>Scope</th><th>What it isolates</th></tr>
+      <tr><td class="hl">Worker</td><td>OS process</td><td>Its own browser instance, memory, and environment — never shared across workers</td></tr>
+      <tr><td class="hl">Test fixture</td><td>One test</td><td>Torn down and rebuilt fresh for every single test, e.g. a new page</td></tr>
+      <tr><td class="hl">Worker fixture</td><td>One worker</td><td>Reused across every test that worker runs, e.g. a launched browser</td></tr>
+      <tr><td class="hl">Shard</td><td>One machine</td><td>A whole slice of the suite, split across separate CI runners rather than processes</td></tr>
+    </table>
+    <p class="stage-caption" style="margin-top:26px;">Workers scale parallelism on one machine; sharding scales it across several machines once one machine's CPU is the bottleneck. Tuning generally starts with workers and only reaches for sharding after that.</p>
+  </div>
+</section>
+
+<section id="trace">
+  <div class="wrap">
+    <div class="kicker">06 — LOOKING BACK</div>
+    <h2>A trace is a recording of the whole chain</h2>
+    <p>Because every action already passes through one central server, that server is well-placed to record everything going through it. Turning tracing on captures a timeline of actions, DOM snapshots before and after each step, network activity, and console output, and packages it into a single file that the Trace Viewer can replay later — without needing to run the test again to see what happened.</p>
+  </div>
+</section>
+
+<section id="reach">
+  <div class="wrap">
+    <div class="kicker">07 — WHERE IT'S HEADED</div>
+    <h2>The same server, a newer kind of client</h2>
+    <p>The client-server split has stayed essentially the same since Playwright's first stable release; what's changed around it is the tooling. The most recent addition is an MCP server that exposes Playwright's actions as structured tools an AI agent can call directly — the same underlying server, but with an AI system sitting in the client seat instead of a fixed test script.</p>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <p>This page summarizes publicly documented Playwright architecture and community write-ups on its internals; it is not official Microsoft documentation.</p>
+    <div class="sources">
+      <a href="https://playwright.dev/docs/test-parallel" target="_blank" rel="noopener">playwright.dev — parallelism</a>
+      <a href="https://github.com/microsoft/playwright" target="_blank" rel="noopener">github.com/microsoft/playwright</a>
+      <a href="https://deepwiki.com/microsoft/playwright/8.2-release-process" target="_blank" rel="noopener">deepwiki — protocol architecture</a>
+    </div>
+  </div>
+</footer>
+
+</body>
+</html>
