@@ -16,3 +16,13 @@ test('has title', async ({ page }) => {
 //   // Expects page to have a heading with the name of Installation.
 //   await expect(page.getByRole('heading', { name: 'Installation' })).toBeVisible();
 // });
+
+test ('viewer test', async ({ page }) => {
+await page.goto('https://playwright.dev/');
+await expect(page).toHaveTitle("Fast and reliable end-to-end testing for modern web apps | Playwright");
+});
+
+test ('admin test', async ({ page }) => {
+await page.goto('https://playwright.dev/');
+await expect(page).toHaveTitle("Fast and reliable end-to-end testing for modern web apps | Playwright");
+});
