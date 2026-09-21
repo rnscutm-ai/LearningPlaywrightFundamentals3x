@@ -8,8 +8,8 @@ let password = page.getByRole("textbox",{name:'Password'});
 
 await userName.fill("hgxhgx@gmail.com");
 await password.fill("shvcjh");
-await page.waitForTimeout(500000);
-await page.pause();
+// await page.waitForTimeout(500000);
+// await page.pause();
 
 
 });
