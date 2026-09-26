@@ -9,5 +9,10 @@ node_modules/
 .env
 user-session.json
 
+# Generated reports
+/allure-results/
+/reports/
+/tta-report/
+
 # Command Code local tooling
 .commandcode/
