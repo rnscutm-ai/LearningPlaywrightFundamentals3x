@@ -14,5 +14,8 @@ user-session.json
 /reports/
 /tta-report/
 
+# Screenshots written by page.screenshot() to the project root
+/*.png
+
 # Command Code local tooling
 .commandcode/
