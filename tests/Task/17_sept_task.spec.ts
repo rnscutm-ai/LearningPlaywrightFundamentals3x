@@ -11,10 +11,10 @@ await student_Login_Email_field.fill("agfgh@gmail.com");
 let student_Login_Password_field = page.locator("#password");
 await student_Login_Password_field.fill("vcv");
 
-let remember_Checkbox = await page.locator("//input[@name='remember']");
+let remember_Checkbox =  page.locator("//input[@name='remember']");
 await remember_Checkbox.click();
 
-let sumbit_button = await page.locator(".login-btn").first();
+let sumbit_button =  page.locator(".login-btn").first();
 await sumbit_button.click();
 
 await page.goto("https://app.thetestingacademy.com/playwright/multiple_element_filter?email=xvhgxv%40hfhf.com&password=hgfhs&remember=yes#login-success");
