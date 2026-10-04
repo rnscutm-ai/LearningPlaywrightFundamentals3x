@@ -1,0 +1,43 @@
+import { test, expect} from '@playwright/test';
+
+test("Verify the TestCase for webTable Example-1", async({page})=>{
+await page.goto("https://awesomeqa.com/webtable.html"); 
+
+//table[@id="customers"]
+//table[@id="customers"]/tbody/tr -> Rows (in heading) -> 7
+
+//Helen -> //table[@id="customers"]/tbody/tr[5]/td[2]
+
+//table[@id="customers"]/tbody/tr[5]/td[2]/preceding-sibling::td -> Company
+//table[@id="customers"]/tbody/tr[5]/td[2]/following-sibling::td -> Country
+
+//table[@id="customers"]/tbody/tr[5]/td[2]
+// 5-i, 1 to 7,(1 header) 2 to 7
+// ]/td[
+// 2 - j, j -> 1,2,3
+// ]
+
+const firstPart = "//table[@id='customers']/tbody/tr[";
+const secondPart = "]/td[";
+const thirdPart = "]";
+
+const rows = await page.locator("//table[@id='customers']/tbody/tr").count();
+const cols = await page.locator("//table[@id='customers']/tbody/tr[2]/td").count(); 
+
+for(let i = 2; i <= rows; i++){
+    for(let j = 1; j <= cols; j++){
+        const dynamicPath = `${firstPart} ${i} ${secondPart} ${j} ${thirdPart}`;
+        //console.log(dynamicPath);
+        const data = await page.locator(dynamicPath).innerText();
+        console.log(data); 
+        if(data.includes('Helen Bennet')){
+            const countryPath = `${dynamicPath}/following-sibling::td`;
+            const countryText = await page.locator(countryPath).innerText();
+            console.log("----------------------------");
+            console.log(`Helen Bennet is in - ${countryText}`);
+        }
+
+    }
+    }
+
+});
