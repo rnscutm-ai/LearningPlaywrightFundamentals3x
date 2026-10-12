@@ -1,0 +1,22 @@
+import { test, expect, Locator, } from '@playwright/test';
+import path from 'path';
+
+test.describe('File Upload', () => {
+
+    const URL = "https://the-internet.herokuapp.com/upload";
+
+    test.beforeEach(async ({ page }) => {
+        await page.goto(URL,{waitUntil: "domcontentloaded"});
+
+    });
+    test('Locate FileUpload and upload', async ({ page }) => {
+        // should know the path of the file
+        const filePath = path.join(__dirname, 'testdata.txt');
+        console.log(filePath);
+        // __dirname - current working directory full path
+        await page.locator('#file-upload').setInputFiles(filePath);
+        await page.getByRole('button',{name: 'Upload'}).click();
+        await expect(page.locator('#uploaded-files')).toContainText('testdata.txt');
+
+    });
+});
