@@ -14,6 +14,10 @@ user-session.json
 /reports/
 /tta-report/
 
+# Files written by tests and lessons at runtime
+/out/
+/output.json
+
 # Screenshots written by page.screenshot() to the project root
 /*.png
 
